@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2026 the ReTraced project
 //
-// ReTraced adapter for Hookshot: the only file of ours that sees Hookshot's internals. tools/apply-hooks.ps1 copies it
-// into hookshot/gpu/vk/ (with rt_api.h written in place of its #include, so that Hookshot's build sees every change),
-// and adds the few call lines listed in hooks.json. It loads retraced.dll beside the executable and turns Hookshot's
-// events into the calls of rt_api.h. Without the DLL, or with RETRACED=0, every hook returns at once: stock Hookshot.
+// ReTraced adapter for Longshot (the continuation of Hookshot): the only file of ours that sees Longshot's internals.
+// tools/apply-hooks.ps1 copies it into gpu/vk/ of Longshot's source (with rt_api.h written in place of its #include, so
+// that Longshot's build sees every change), and adds the few call lines listed in hooks.json. It is compiled into the
+// renderer, longshot_vk.dll; it loads retraced.dll beside the executable and turns Longshot's events into the calls of
+// rt_api.h. Without the DLL, or with RETRACED=0, every hook returns at once: stock Longshot.
 #include "vk_internal.h"
 #include "vk_loader.h"
 #include "vk_state.h"
 #include "vk_draw.h"
+#include "menu_module.h"
 
 #include <algorithm>
 #include <atomic>
@@ -37,9 +39,11 @@ uint32_t g_nmust = 0;
 
 void host_log(const char* line) { mkwvk::logf("retraced: %s", line); }
 
-// (the queue is shared with Hookshot's submits and presents, which take dev.present_mu: "one queue, they take turns")
+// (the queue is shared with Longshot's submits and presents, which take dev.present_mu: "one queue, they take turns";
+// the submits Longshot holds back (RX_VK_BATCH) go first, so the queue keeps their order)
 int host_queue_submit(const VkSubmitInfo2* si, VkFence fence) {
     std::lock_guard lk(mkwvk::dev.present_mu);
+    mkwvk::queue_flush_locked();
     return vkx::vkQueueSubmit2(mkwvk::dev.queue, 1, si, fence) == VK_SUCCESS;
 }
 
@@ -75,7 +79,7 @@ const RtExports* core() {
     wcscat(path, L"retraced.dll");
     HMODULE m = LoadLibraryW(path);
     if (!m) {
-        mkwvk::logf("retraced: no retraced.dll beside the executable, Hookshot runs alone");
+        mkwvk::logf("retraced: no retraced.dll beside the executable, Longshot runs alone");
         return nullptr;
     }
     auto get = (PFN_rt_get_exports)(void*)GetProcAddress(m, "rt_get_exports");
@@ -84,7 +88,7 @@ const RtExports* core() {
         mkwvk::logf("retraced: retraced.dll does not speak interface %u, left out", RT_API_VERSION);
         return nullptr;
     }
-    static const RtHost host = {RT_API_VERSION, "hookshot", RTX_HOST_REVISION, host_log, host_queue_submit, host_mirror,
+    static const RtHost host = {RT_API_VERSION, "longshot", RTX_HOST_REVISION, host_log, host_queue_submit, host_mirror,
                                 host_guest, host_queue_locked};
     if (!x->init(&host)) return nullptr;
     g_rt = x;
@@ -166,7 +170,7 @@ void rtx_device_features(void**& tail) {
 void rtx_device_created() {
     auto* x = core();
     if (!x) return;
-    // every SPIR-V module of the game and of Hookshot goes through vkx::vkCreateShaderModule (vk_loader.h); wrapping the
+    // every SPIR-V module of the game and of Longshot goes through vkx::vkCreateShaderModule (vk_loader.h); wrapping the
     // pointer here keeps vk_shader.cpp, which is in the program cache's stamp, untouched
     g_real_create_module = vkx::vkCreateShaderModule;
     vkx::vkCreateShaderModule = create_module;
@@ -239,7 +243,7 @@ int rtx_draw(const NvnState& s, const DrawArgs& d, uint64_t key, int n_colors, V
 
 thread_local bool rtx_xfb_now = false;   // (set by H10 for the draw being made, read around its draw command)
 
-// XA-XD, right around the draw command, inside the render pass: the capture of this draw's positions
+// XA, XC, right around the draw command, inside the render pass: the capture of this draw's positions
 void rtx_xfb_begin(VkCommandBuffer cmd) {
     if (g_rt && g_rt->xfb_begin) g_rt->xfb_begin(cmd);
 }
@@ -247,14 +251,9 @@ void rtx_xfb_end(VkCommandBuffer cmd) {
     if (g_rt && g_rt->xfb_end) g_rt->xfb_end(cmd);
 }
 
-// H10's second half: the core records its own commands into the frame's command buffer (Hookshot's pass is ended)
+// H10's second half: the core records its own commands into the frame's command buffer (Longshot's pass is ended)
 void rtx_inject(VkCommandBuffer cmd) {
     if (g_rt && g_rt->inject) g_rt->inject(cmd);
-}
-
-// M1, in the menu's bitmap: rewritten for an HDR10 window (its bytes are copied as they are into the window's image)
-void rtx_overlay_pixels(uint8_t* px, size_t n) {
-    if (g_rt && g_rt->overlay_pixels) g_rt->overlay_pixels(px, n);
 }
 
 // H13, at the start of each recording: the previous frame's commands are all submitted
@@ -329,7 +328,7 @@ void rtx_uniform(const NvnState& s, uint64_t key, int ns, uint32_t bank, VkDescr
     u.size = bi.range == VK_WHOLE_SIZE || bi.range > 65536 ? 0 : (uint32_t)bi.range;
     u.source = 2;
     if (bank >= 3 && bank < 19) u.guest_addr = s.ubo[std::clamp(ns, 0, kNvnStages - 1)][bank - 3].addr;
-    if (bi.buffer && bi.buffer == stream && mapped) {   // (Hookshot's copy for this recording, inline updates in: exact)
+    if (bi.buffer && bi.buffer == stream && mapped) {   // (Longshot's copy for this recording, inline updates in: exact)
         u.bytes = mapped + bi.offset;
         u.source = 0;
     } else if (bank >= 3 && bank < 19) {   // (a pool's mirror: the guest's memory as it is now, maybe a frame ahead)
@@ -389,8 +388,8 @@ void rtx_swapchain_created(VkSwapchainKHR sc, const VkSurfaceFormatKHR& fmt) {
     if (g_rt && g_rt->swapchain_created) g_rt->swapchain_created(sc, fmt);
 }
 
-// The rows ReTraced adds to the Insert menu (hooks R1, S1, S2 in vk_menu.cpp): the menu writes these values, each frame
-// the ones that changed go to the core.
+// The rows ReTraced adds to the Insert menu (the OcarinaVR module below): the menu writes these values, each frame the
+// ones that changed go to the core.
 constexpr int kRtxMenuRows = 21;   // (20: Link's arms on the player's hands)     // (18, 19: the hands' tilt, the player's arm)     // (16, 17: the VR mode's whole body, gestures)   // (13 to 15: the VR mode's first person, big screen, turn by steps)   // (clouds, cover, water, shafts, status line, light by rays, its share, its sky, sun on the water, caustics, simulated water, its waves, water in particles)
 int rtx_menu_val[21] = {0, 45, 0, 0, 1, 0, 100, 100, 1, 25, 1, 100, 0, 1, 0, 1, 0, 1, 0, 55, 1};
 int rtx_menu_sent[21] = {};
@@ -411,18 +410,39 @@ void rtx_menu_poll() {
         }
     }
 }
-int rtx_status_on() { return rtx_has_live() && rtx_menu_val[4] ? 1 : 0; }
-const char* rtx_status_text() { return rtx_has_live() ? g_rt->status_text() : ""; }
-const char* rtx_tx_num(int v) {   // (a plain number: degrees, centimetres)
-    static thread_local char b[16];
-    std::snprintf(b, sizeof b, "%d", v);
-    return b;
-}
 
-const char* rtx_tx_pct(int v) {
-    static char b[12];
-    std::snprintf(b, sizeof b, "%d %%", v);
-    return b;
+// The VR mode's rows, first on the Graphics tab under their own heading (Longshot's menu modules, gpu/vk/menu_module.h).
+// Their values are the core's: read from it at the first frame, sent to it when they change (rtx_menu_poll).
+namespace {
+menu::Setting rtx_onoff_row(const char* key, const char* label, int i, const char* help) {
+    return {.key = key, .label = label, .help = help, .kind = menu::Kind::Toggle, .value = &rtx_menu_val[i], .lo = 0, .hi = 1,
+            .preset_exempt = true};
+}
+menu::Setting rtx_number_row(const char* key, const char* label, int i, int lo, int hi, int step, const char* help) {
+    return {.key = key, .label = label, .help = help, .kind = menu::Kind::Slider, .value = &rtx_menu_val[i], .lo = lo, .hi = hi,
+            .step = step, .preset_exempt = true, .text = [](int v) { return std::to_string(v); }};
+}
+} // namespace
+
+MENU_MODULE(ocarinavr) {
+    menu::tab("graphics")
+        .heading("ocarinavr", "OcarinaVR", menu::first())
+        .row(rtx_onoff_row("ocarinavr_first_person", "First person", 13,
+                           "Headset: the view from Link's eyes (off: the game's camera, behind him). Key P. At once."))
+        .row(rtx_onoff_row("ocarinavr_big_screen", "Big screen", 14,
+                           "Headset: the game on a big screen in relief, with its own camera (off: inside the game). Key V. At once."))
+        .row(rtx_onoff_row("ocarinavr_snap_turning", "Snap turning", 15,
+                           "Headset, first person: the right stick turns in 30-degree steps (easier on the stomach); off: smoothly. At once."))
+        .row(rtx_onoff_row("ocarinavr_body_visible", "Link's body visible", 16,
+                           "Headset, first person: Link's whole body under your eyes (off: his arms alone, his hands exactly on yours). At once."))
+        .row(rtx_onoff_row("ocarinavr_gestures", "Gestures", 17,
+                           "Headset: strike with a real swing, draw from your back, raise the shield, take and throw, aim with both hands. Off: buttons only. At once."))
+        .row(rtx_onoff_row("ocarinavr_hands", "Link's hands on yours", 20,
+                           "Headset: Link's arms follow your controllers or bare hands, fingers included (off: his arms keep the game's pose). At once."))
+        .row(rtx_number_row("ocarinavr_hand_tilt", "Hand tilt", 18, -90, 90, 5,
+                            "Headset: if Link's hands are tilted against yours, turn them forward or back (degrees). At once."))
+        .row(rtx_number_row("ocarinavr_arm_length", "Your arm length", 19, 30, 80, 2,
+                            "Headset: from your shoulder to your wrist, in centimetres; the world is scaled so that Link's arms are yours. At once."));
 }
 
 void rtx_frame() {

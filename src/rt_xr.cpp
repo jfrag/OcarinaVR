@@ -1241,7 +1241,7 @@ void loop() {
 // the game's window closed, the link with the headset closed in time, then the process stayed alive
 // for good with one thread inside NVIDIA's Vulkan driver, called from vulkan-1.dll as the libraries were unloaded
 // (read with a stack tool); the next start, beside it, prepared its pipelines for minutes instead of 2 seconds.
-// Nothing is lost: Hookshot saves its caches during play, not at the exit.
+// Nothing is lost: Longshot saves its caches during play, not at the exit.
 int exit_hard() { return runtime_loaded.load() ? 1 : 0; }
 
 int shutdown(int wait_ms) {

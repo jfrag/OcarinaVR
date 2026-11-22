@@ -6,8 +6,8 @@ OcarinaVR: Copyright (c) 2026 the ReTraced project. GNU General Public License, 
 
 | Part | Where from | Licence |
 | --- | --- | --- |
-| Hookshot (source, at a fixed revision) | Hookshot's own repository, [git.notrexed.dev/Hookshot/Hookshot](https://git.notrexed.dev/Hookshot/Hookshot) | GPL-3.0-or-later; its third-party parts keep their own notices in its folders |
-| Hookshot's build tools ("builder parts": Python and its modules, Vulkan headers and FFmpeg, prebuilt third-party files, wgpu-native, the work files) | Hookshot's releases | Each part's own licence, as Hookshot ships it |
+| Longshot, a continuation of NotRexed's Hookshot (its Builder of a fixed release, which carries its source) | Longshot's releases, [git.magicbean.dev/MagicBeanDev/Longshot](https://git.magicbean.dev/MagicBeanDev/Longshot) | GPL-3.0-or-later; its third-party parts keep their own notices in its folders |
+| Longshot's build tools (from its `tools.lock`: Python and its modules, Vulkan headers and FFmpeg, prebuilt third-party files) | Longshot's package mirrors, then their origin (Hookshot's releases) | Each part's own licence, as Longshot ships it |
 | llvm-mingw (the compiler) | [github.com/mstorsjo/llvm-mingw](https://github.com/mstorsjo/llvm-mingw) | Apache-2.0 with LLVM exception; the mingw-w64 libraries under their own licences |
 | OpenXR loader (`openxr_loader.dll`) | Khronos, [github.com/KhronosGroup/OpenXR-SDK](https://github.com/KhronosGroup/OpenXR-SDK) | Apache-2.0 |
 

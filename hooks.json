@@ -1,9 +1,9 @@
 {
-  "base": "bbdc370",
-  "note": "Lines added to Hookshot, found by an anchor text (never by a line number). tools/apply-hooks.ps1 puts them in, checks them and takes them out. No line goes into vk_shader.cpp: that file is part of the shader cache's key.",
+  "base": "a2dc538",
+  "note": "Lines added to Longshot (the continuation of Hookshot), v3.1.1, found by an anchor text (never by a line number). tools/apply-hooks.ps1 puts them in, checks them and takes them out. No line goes into vk_shader.cpp: that file is part of the shader cache's key.",
   "adapter": {
-    "source": "adapter/rtx_hookshot.cpp",
-    "target": "gpu/vk/rtx_hookshot.cpp",
+    "source": "adapter/rtx_longshot.cpp",
+    "target": "gpu/vk/rtx_longshot.cpp",
     "api": "src/rt_api.h"
   },
   "hooks": [
@@ -58,26 +58,18 @@
     {
       "id": "H12",
       "file": "gpu/vk/vk_draw.cpp",
-      "anchor": "dw().bufs.push_back(uniform_range(s, st, d.index + k));",
+      "anchor": "out.bufs.push_back(uniform_range(s, st, d.index + k));",
       "where": "after",
-      "line": "if (rtx_watch_on || rtx_alt_blocks) rtx_uniform(s, p.key, ns | (rtx_gbuf_on && p.wm_sig.load(std::memory_order_relaxed) > 0 ? (int)(p.wm_sig.load(std::memory_order_relaxed) >> 60 & 3) << 8 : 0), d.index + k, dw().bufs.back(), cur ? cur->stream : VK_NULL_HANDLE, cur ? cur->mapped : nullptr, [](const void* src, uint32_t n, VkDescriptorBufferInfo* o) { const uint64_t al = std::max<uint64_t>(dev.props.limits.minUniformBufferOffsetAlignment, 16); if (!cur || !stream_reserve(n, al)) return false; const uint64_t at = stream_alloc(n, al); if (at == UINT64_MAX) return false; std::memcpy(cur->mapped + at, src, n); *o = {cur->stream, at, n}; return true; });",
+      "line": "if (rtx_watch_on || rtx_alt_blocks) rtx_uniform(s, p.key, ns | (rtx_gbuf_on && p.wm_sig.load(std::memory_order_relaxed) > 0 ? (int)(p.wm_sig.load(std::memory_order_relaxed) >> 60 & 3) << 8 : 0), d.index + k, out.bufs.back(), cur ? cur->stream : VK_NULL_HANDLE, cur ? cur->mapped : nullptr, [](const void* src, uint32_t n, VkDescriptorBufferInfo* o) { const uint64_t al = std::max<uint64_t>(dev.props.limits.minUniformBufferOffsetAlignment, 16); if (!cur || !stream_reserve(n, al)) return false; const uint64_t at = stream_alloc(n, al); if (at == UINT64_MAX) return false; std::memcpy(cur->mapped + at, src, n); *o = {cur->stream, at, n}; return true; });",
       "why": "uniform blocks of the programs the core watches (a single test otherwise); the core may hand back a changed copy, written into the recording's stream and bound in its place. VR mode: the blocks of a draw the core asked to see (Link's pieces: the pose of his arms is replaced by the player's hands)"
     },
     {
-      "id": "X1",
-      "file": "host/nn_vi.c",
-      "anchor": "if (ARG(2)) *(uint16_t *)GP(ARG(2)) = 0;",
-      "where": "after",
-      "line": "if (getenv(\"RETRACED_GAME_HDR\") && getenv(\"RETRACED_GAME_HDR\")[0] == '1') { *(uint8_t *)GP(ARG(0)) = 1; if (ARG(1)) G32(ARG(1)) = getenv(\"RETRACED_GAME_HDR_FORMAT\") ? (uint32_t)atoi(getenv(\"RETRACED_GAME_HDR_FORMAT\")) : 0; if (ARG(2)) *(uint16_t *)GP(ARG(2)) = getenv(\"RETRACED_GAME_HDR_PEAK\") ? (uint16_t)atoi(getenv(\"RETRACED_GAME_HDR_PEAK\")) : 1000; }",
-      "why": "reference experiment: tell the game the display is HDR (RETRACED_GAME_HDR=1, _PEAK, _FORMAT); off by default"
-    },
-    {
-      "id": "X2",
-      "file": "host/nn_vi.c",
-      "anchor": "*(uint16_t *)GP(ARG(0)) = 203;",
-      "where": "after",
-      "line": "if (getenv(\"RETRACED_GAME_HDR_PAPER\")) *(uint16_t *)GP(ARG(0)) = (uint16_t)atoi(getenv(\"RETRACED_GAME_HDR_PAPER\"));",
-      "why": "reference experiment: the paper white announced to the game"
+      "id": "H12b",
+      "file": "gpu/vk/vk_draw.cpp",
+      "anchor": "    const bool same_desc = !no_reuse && !early_rebind && cb.desc.valid",
+      "where": "before",
+      "line": "    if (rtx_alt_blocks) cb.desc.valid = false;",
+      "why": "VR mode: a draw whose uniform blocks the core asked to see (Link's pieces) builds its descriptors, so that H12 sees them: Longshot's Descriptor reuse (on by default) would otherwise keep the last draw's, and his arms would take the game's pose again"
     },
     {
       "id": "H5",
@@ -100,40 +92,24 @@
       "file": "gpu/vk/vk_draw.cpp",
       "anchor": "dlss_trace_draw(s, p, d, at);",
       "where": "after",
-      "line": "if (rtx_draw_on) { const int rf = rtx_draw(s, d, p.key, at.n, at.n ? at.color_format[0] : VK_FORMAT_UNDEFINED, at.n && at.color[0] ? at.color[0]->image : VK_NULL_HANDLE, at.n && at.color[0] ? at.color[0]->usage : 0, at.depth ? at.depth->image : VK_NULL_HANDLE, at.depth_view, at.depth_format, at.depth ? at.depth->usage : 0, at.width, at.height); rtx_xfb_now = (rf & 2) != 0; if (rf & 1) { end_pass(cmd); rtx_inject(cmd); descriptors_disturbed(); last_dyn_valid = false, last_desc_valid = false, last_vb_valid = false, last_pipeline = VK_NULL_HANDLE; vertex_set.on = false, last_ib.on = false; } if (rtx_alt_n < 0) { rtx_alt_n = 0; return; } }",
-      "why": "every draw, for the ray-traced world (graphics features); a single test when off. When the core inserts commands: the pass is closed, descriptors are marked disturbed and the draw state is forgotten"
+      "line": "if (rtx_draw_on) { const int rf = rtx_draw(s, d, p.key, at.n, at.n ? at.color_format[0] : VK_FORMAT_UNDEFINED, at.n && at.color[0] ? at.color[0]->image : VK_NULL_HANDLE, at.n && at.color[0] ? at.color[0]->usage : 0, at.depth ? at.depth->image : VK_NULL_HANDLE, at.depth_view, at.depth_format, at.depth ? at.depth->usage : 0, at.width, at.height); rtx_xfb_now = (rf & 2) != 0; if (rf & 1) { end_pass(cmd); rtx_inject(cmd); descriptors_disturbed(); bound().reset(); } if (rtx_alt_n < 0) { rtx_alt_n = 0; return; } }",
+      "why": "every draw, for the ray-traced world (graphics features); a single test when off. When the core inserts commands: the pass is closed, descriptors are marked disturbed and the draw state is forgotten (bound().reset(): what Longshot itself does after commands recorded by something else)"
     },
     {
       "id": "XA",
       "file": "gpu/vk/vk_draw.cpp",
-      "anchor": "vkCmdDrawIndexed(cmd, (uint32_t)d.count, (uint32_t)std::max(1, d.instances), 0, d.base_vertex, (uint32_t)d.base_instance);",
+      "anchor": "vkCmdDrawIndexed(cmd, (uint32_t)d.count, (uint32_t)std::max(1, d.instances), first_index, d.base_vertex,",
       "where": "before",
-      "line": "if (rtx_xfb_now) rtx_xfb_begin(cmd);",
-      "why": "capture of the positions the game computes (transform feedback): begin, right before an indexed draw"
-    },
-    {
-      "id": "XB",
-      "file": "gpu/vk/vk_draw.cpp",
-      "anchor": "vkCmdDrawIndexed(cmd, (uint32_t)d.count, (uint32_t)std::max(1, d.instances), 0, d.base_vertex, (uint32_t)d.base_instance);",
-      "where": "after",
-      "line": "if (rtx_xfb_now) rtx_xfb_end(cmd), rtx_xfb_now = false;",
-      "why": "capture: end, right after an indexed draw"
+      "line": "struct RtxXfbEnd { VkCommandBuffer c; ~RtxXfbEnd() { if (rtx_xfb_now) rtx_xfb_end(c), rtx_xfb_now = false; } } rtx_xfb_at_exit{cmd}; if (rtx_xfb_now) rtx_xfb_begin(cmd);",
+      "why": "capture of the positions the game computes (transform feedback), around an indexed draw: begun right before it, ended when its block is left, right after it (the draw takes two lines now: no line can go after it)"
     },
     {
       "id": "XC",
       "file": "gpu/vk/vk_draw.cpp",
       "anchor": "vkCmdDraw(cmd, (uint32_t)d.count, (uint32_t)std::max(1, d.instances), (uint32_t)d.first, (uint32_t)d.base_instance);",
       "where": "before",
-      "line": "if (rtx_xfb_now) rtx_xfb_begin(cmd);",
-      "why": "capture: begin, non-indexed draw"
-    },
-    {
-      "id": "XD",
-      "file": "gpu/vk/vk_draw.cpp",
-      "anchor": "vkCmdDraw(cmd, (uint32_t)d.count, (uint32_t)std::max(1, d.instances), (uint32_t)d.first, (uint32_t)d.base_instance);",
-      "where": "after",
-      "line": "if (rtx_xfb_now) rtx_xfb_end(cmd), rtx_xfb_now = false;",
-      "why": "capture: end, non-indexed draw"
+      "line": "struct RtxXfbEnd { VkCommandBuffer c; ~RtxXfbEnd() { if (rtx_xfb_now) rtx_xfb_end(c), rtx_xfb_now = false; } } rtx_xfb_at_exit{cmd}; if (rtx_xfb_now) rtx_xfb_begin(cmd);",
+      "why": "capture: the same around a non-indexed draw"
     },
     {
       "id": "W1",
@@ -150,22 +126,6 @@
       "where": "before",
       "line": "if (rtx_must_on && !pe->ready.load(std::memory_order_acquire) && rtx_must_draw(p.key)) wait_for(pe->ready);",
       "why": "the same while their pipeline is being built"
-    },
-    {
-      "id": "D4",
-      "file": "gpu/vk/vk_menu.cpp",
-      "anchor": "#include \"vk_menu.h\"",
-      "where": "after",
-      "line": "namespace mkwvk { void rtx_overlay_pixels(uint8_t*, size_t); }",
-      "why": "declaration of the menu hook"
-    },
-    {
-      "id": "M1",
-      "file": "gpu/vk/vk_menu.cpp",
-      "anchor": "    out.version++;",
-      "where": "before",
-      "line": "rtx_overlay_pixels(out.px.data(), out.px.size() / 4);",
-      "why": "Hookshot's menu in an HDR10 window: its 8-bit bytes are rewritten as A2B10G10R10 PQ (false colours otherwise)"
     },
     {
       "id": "D2",
@@ -186,7 +146,7 @@
     {
       "id": "H14",
       "file": "gpu/vk/vk_replay.cpp",
-      "anchor": "dlss_idle();   // (NVIDIA DLSS: its video memory",
+      "anchor": "temporal_idle();   // (DLSS, FSR",
       "where": "after",
       "line": "rtx_frame();",
       "why": "end of every presented frame"
@@ -218,58 +178,10 @@
     {
       "id": "T4",
       "file": "gpu/vk/vk_draw.cpp",
-      "anchor": "        d.wm[i] = target_write_mask(*cur_program, s, i);",
+      "anchor": "        d.wm[i] = target_write_mask(p, s, i);",
       "where": "after",
       "line": "        if (rtx_gbuf_on && i >= 1 && !at.color[i] && at.color_view[i]) d.en[i] = VK_FALSE;",
       "why": "graphics features: no blending into our targets, whatever the game's state says for that index"
-    },
-    {
-      "id": "D5",
-      "file": "gpu/vk/vk_menu.cpp",
-      "anchor": "#include \"vk_menu_hit.h\"",
-      "where": "after",
-      "line": "namespace mkwvk { extern int rtx_menu_val[21]; int rtx_status_on(); const char* rtx_status_text(); const char* rtx_tx_pct(int); const char* rtx_tx_num(int); }",
-      "why": "declarations of the menu lines added by ReTraced and of its status line (adapter)"
-    },
-    {
-      "id": "R1",
-      "file": "gpu/vk/vk_menu.cpp",
-      "anchor": "{TAB_GAMEPLAY, \"FPS counter\"",
-      "where": "before",
-      "line": "    {TAB_GRAPHICS, \"OcarinaVR: first person\", &rtx_menu_val[13], 0, 1, 1, tx_onoff, \"Headset: the view from Link's eyes (off: the game's camera, behind him). Key P. At once.\", nullptr, false, true}, {TAB_GRAPHICS, \"OcarinaVR: big screen\", &rtx_menu_val[14], 0, 1, 1, tx_onoff, \"Headset: the game on a big screen in relief, with its own camera (off: inside the game). Key V. At once.\", nullptr, false, true}, {TAB_GRAPHICS, \"OcarinaVR: snap turning\", &rtx_menu_val[15], 0, 1, 1, tx_onoff, \"Headset, first person: the right stick turns in 30-degree steps (easier on the stomach); off: smoothly. At once.\", nullptr, false, true}, {TAB_GRAPHICS, \"OcarinaVR: Link's body visible\", &rtx_menu_val[16], 0, 1, 1, tx_onoff, \"Headset, first person: Link's whole body under your eyes (off: his arms alone, his hands exactly on yours). At once.\", nullptr, false, true}, {TAB_GRAPHICS, \"OcarinaVR: gestures\", &rtx_menu_val[17], 0, 1, 1, tx_onoff, \"Headset: strike with a real swing, draw from your back, raise the shield, take and throw, aim with both hands. Off: buttons only. At once.\", nullptr, false, true}, {TAB_GRAPHICS, \"OcarinaVR: Link's hands on yours\", &rtx_menu_val[20], 0, 1, 1, tx_onoff, \"Headset: Link's arms follow your controllers or bare hands, fingers included (off: his arms keep the game's pose). At once.\", nullptr, false, true}, {TAB_GRAPHICS, \"OcarinaVR: hand tilt\", &rtx_menu_val[18], -90, 90, 5, rtx_tx_num, \"Headset: if Link's hands are tilted against yours, turn them forward or back (degrees). At once.\", nullptr, false, true}, {TAB_GRAPHICS, \"OcarinaVR: your arm length\", &rtx_menu_val[19], 30, 80, 2, rtx_tx_num, \"Headset: from your shoulder to your wrist, in centimetres; the world is scaled so that Link's arms are yours. At once.\", nullptr, false, true},",
-      "why": "ReTraced's lines in the Graphics tab of Hookshot's menu (values kept in the adapter, sent to the core every frame): graphics settings and the VR mode's settings"
-    },
-    {
-      "id": "S0",
-      "file": "gpu/vk/vk_menu.cpp",
-      "anchor": "Upload ups[3][3];",
-      "where": "after",
-      "line": "Bitmap rtx_bmp; Upload rtx_ups[3];   // (retraced: the status line's bitmap, under the FPS counter)",
-      "why": "the image of ReTraced's status line and its copies, like those of the frame counter"
-    },
-    {
-      "id": "S1",
-      "file": "gpu/vk/vk_menu.cpp",
-      "anchor": "gdi_draw(fps_bmp, 120u * scale, 54u * scale, paint_fps, scale);",
-      "where": "after",
-      "line": "            if (rtx_status_on()) { rtx_bmp.keyed = true; gdi_draw(rtx_bmp, 720u * scale, 22u * scale, [](HDC dc, uint32_t w, uint32_t h, int s) { fill(dc, 0, 0, (int)w, (int)h, RGB(0, 0, 0)); SetBkMode(dc, TRANSPARENT); SetTextAlign(dc, TA_RIGHT | TA_TOP); HFONT f = hard_font(13 * s, FW_BOLD); HGDIOBJ o = SelectObject(dc, f); outlined(dc, (int)w - 2 * s, 2 * s, rtx_status_text(), RGB(255, 214, 90), s); SelectObject(dc, o); DeleteObject(f); }, scale); } else { std::lock_guard g(bmp_mu); rtx_bmp.w = 0; }",
-      "why": "ReTraced's status line, drawn with the frame counter (twice a second)"
-    },
-    {
-      "id": "S2",
-      "file": "gpu/vk/vk_menu.cpp",
-      "anchor": "if (fw) copy_over(cmd, dst, fps_bmp, ups[1][slot], (int)w - (int)fw - (int)(12 * cur_scale), (int)(10 * cur_scale), w, h);",
-      "where": "after",
-      "line": "        { std::unique_lock lk3(bmp_mu); const uint32_t rw = rtx_bmp.w; lk3.unlock(); if (rw) copy_over(cmd, dst, rtx_bmp, rtx_ups[slot], (int)w - (int)rw - (int)(12 * cur_scale), (int)(66 * cur_scale), w, h); }",
-      "why": "the status line copied under the frame counter"
-    },
-    {
-      "id": "S3",
-      "file": "gpu/vk/vk_menu.cpp",
-      "anchor": "    if (opts.show_fps) {",
-      "where": "before",
-      "line": "    if (rtx_status_on() && !opts.show_fps) opts.show_fps = 1;   // (retraced S3: the status line comes with the FPS counter)",
-      "why": "ReTraced's status line turns Hookshot's frame counter on, under which it is shown"
     },
     {
       "id": "V3",
@@ -306,7 +218,7 @@
     {
       "id": "V6b",
       "file": "gpu/vk/vk_draw.cpp",
-      "anchor": "        d.wm[i] = target_write_mask(*cur_program, s, i);",
+      "anchor": "        d.wm[i] = target_write_mask(p, s, i);",
       "where": "after",
       "line": "        if (rtx_ui_on && i == 0 && at.n == 1) rtx_ui_blend(at.color_view[0], d.en[0], d.eq[0], d.wm[0]);",
       "why": "VR mode: in our interface image the alpha must come out as coverage (the game's blending targets an image without alpha)"
@@ -328,6 +240,14 @@
       "why": "VR mode, first person: Link's position (where Hookshot already follows it for its own tools), to put the view at the height of his eyes; whether a scene of the game is playing, to show it on the big screen with the game's camera; and whether he is a child or an adult"
     },
     {
+      "id": "F1",
+      "file": "host/oot_fov.c",
+      "anchor": "    if (percent == 100 || percent < 50 || percent > 150 || !camera) return;",
+      "where": "before",
+      "line": "    if (GetModuleHandleA(\"retraced.dll\")) return;   /* the headset gives the field of view: the Insert menu's Field of view would scale it */",
+      "why": "VR mode: Longshot's Field of view (Insert menu) is left out while retraced.dll is loaded: the headset's lens is set by V1, a scale on it would distort the picture in the headset"
+    },
+    {
       "id": "V8",
       "file": "host/nn_hid.c",
       "anchor": "    rumble_map(v, amp[dev]);",
@@ -346,10 +266,10 @@
     {
       "id": "B1",
       "file": "gpu/vk/vk_draw.cpp",
-      "anchor": "vkCmdDrawIndexed(cmd, (uint32_t)d.count, (uint32_t)std::max(1, d.instances), 0, d.base_vertex, (uint32_t)d.base_instance);",
+      "anchor": "vkCmdDrawIndexed(cmd, (uint32_t)d.count, (uint32_t)std::max(1, d.instances), first_index, d.base_vertex,",
       "where": "before",
       "line": "if (rtx_alt_n > 0) { const int rn = rtx_alt_n; rtx_alt_n = 0; const uint64_t ra = stream_alloc((uint64_t)rn * 4, 16); if (ra != UINT64_MAX) { std::memcpy(cur->mapped + ra, rtx_alt_idx, (size_t)rn * 4); bind_index(cmd, cur->stream, ra, VK_INDEX_TYPE_UINT32); vkCmdDrawIndexed(cmd, (uint32_t)rn, (uint32_t)std::max(1, d.instances), 0, d.base_vertex, (uint32_t)d.base_instance); } } else",
-      "why": "VR mode, first person: the triangles the core keeps of a piece of Link (his arms) are drawn in place of the whole piece; our index numbers are written into the recording's stream, as Hookshot does itself for its quads. Must stay the LAST hook before the indexed draw"
+      "why": "VR mode, first person: the triangles the core keeps of a piece of Link (his arms) are drawn in place of the whole piece; our index numbers are written into the recording's stream, as Longshot does itself for its quads. Must stay the LAST hook before the indexed draw"
     },
     {
       "id": "Z1",
@@ -362,8 +282,8 @@
     {
       "id": "Y1",
       "file": "gpu/vk/vk_draw.cpp",
-      "anchor": "        r.si = 0, r.stream = s.buffer, r.stream_alloc = s.alloc, r.mapped = s.mapped, r.size = s.size;",
-      "where": "after",
+      "anchor": "    if (r.before + r.used > stream_peak.load(std::memory_order_relaxed))",
+      "where": "before",
       "line": "        rtx_rec_serial++;",
       "why": "a command recording begins (its buffer starts again from zero): our adapter hands a uniform block already copied back only within the same recording"
     },
@@ -410,15 +330,15 @@
     {
       "id": "V10b",
       "file": "nx2/lift.py",
-      "anchor": "oot_occlusion.install(L, img)",
+      "anchor": "oot_jitter.install(L, img)",
       "where": "after",
       "line": "if img.word(0x806dc5b0) == 0x9b1426fc: L.after[0x806dc5b0] = (L.after[0x806dc5b0] + \"\\n\" if 0x806dc5b0 in L.after else \"\") + \"{ extern void hos_rt_view_fill(Ctx *c, uint64_t view); hos_rt_view_fill(c, c->x[28]); }   /* (retraced V10: the true view for the graphics card) */\"",
-      "why": "VR mode: the site (after the game's instruction at main+0x6bc5b0, which has just computed the view's address in x28, routine main+0x6bc520) that calls hos_rt_view_fill; the original word is checked, another game version leaves the site out. It changes the lift's key: the game is translated again once"
+      "why": "VR mode: the site (after the game's instruction at main+0x6bc5b0, which has just computed the view's address in x28, routine main+0x6bc520) that calls hos_rt_view_fill; the original word is checked, another game version leaves the site out. Installed before the functions are discovered, as Longshot's own sites (its locals keep a function with spliced code in the context). It changes the lift's key: the game is translated again once"
     },
     {
       "id": "V10c",
       "file": "nx2/lift.py",
-      "anchor": "import oot_occlusion",
+      "anchor": "oot_jitter.install(L, img)",
       "where": "before",
       "line": "print(\"retraced V10: the views' fill site is %s\" % (\"installed\" if img.word(0x806dc5b0) == 0x9b1426fc else \"left out (another game version)\"))",
       "why": "VR mode: says in the build log whether site V10b was installed"

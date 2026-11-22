@@ -36,7 +36,7 @@ typedef struct RtBuffer {
 // What the host offers the core (a table of functions, filled by the adapter).
 typedef struct RtHost {
     uint32_t version;              // RT_API_VERSION
-    const char* host_name;         // "hookshot" (for the report only)
+    const char* host_name;         // "longshot" (for the report only)
     const char* host_revision;     // pinned base revision, for the report
     void (*log)(const char* line); // into the host's own log, prefixed by the adapter
     // Submits on the host's queue under the host's own queue lock (one queue: the host's submits and presents take turns).
@@ -180,7 +180,7 @@ typedef struct RtExports {
     int (*wants_targets)(void);
     uint32_t (*extra_targets)(const RtTargets* targets, VkImageView* views, VkFormat* formats);
 
-    // The rows ReTraced adds to Hookshot's Insert menu (Graphics tab), changed while the game runs: id 0 clouds in
+    // The rows ReTraced adds to Longshot's Insert menu (Graphics tab), changed while the game runs: id 0 clouds in
     // volume (0/1), 1 share of the sky they cover (0..100), 2 water mirror (0/1), 3 light shafts (0/1), 4 the status
     // line under the FPS counter (0/1). live_set also keeps the choice for the next start (retraced_menu.ini).
     int (*live_get)(int id);

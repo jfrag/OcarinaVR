@@ -1104,7 +1104,7 @@ void poll_toggle() {
         }
     }
     was_down = down;
-    // Hookshot's own menu opens with Insert or F1: a small keyboard may have neither. menu_key (M) presses Insert for
+    // Longshot's own menu opens with Insert or F1: a small keyboard may have neither. menu_key (M) presses Insert for
     // the player, when the game's window is in front (0: unused).
     static const int vkm = (int)opt_int("menu_key", 'M');
     static bool was_m = false;

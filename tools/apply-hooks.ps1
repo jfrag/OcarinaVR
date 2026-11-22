@@ -1,14 +1,14 @@
-# Puts the lines of hooks.json into a Hookshot source tree, and a copy of our adapter beside Hookshot's renderer.
+# Puts the lines of hooks.json into a Longshot source tree, and a copy of our adapter beside Longshot's renderer.
 # Every line put in carries the mark "// (retraced <id>)" ("# (retraced <id>)" in a Python file). A missing or doubled
-# anchor makes the script FAIL without writing anything: that is the alarm for a Hookshot that has changed.
+# anchor makes the script FAIL without writing anything: that is the alarm for a Longshot that has changed.
 # Files that do not change are not written again (the build's object cache stays valid).
-#   -Hookshot : the Hookshot source folder (default: _build\hookshot beside this repository's root)
+#   -Longshot : the Longshot source folder (default: _build\LongshotBuilder\tools, where the installer puts it)
 #   -Check    : says what would be done, writes nothing
-#   -Remove   : takes all our lines and the adapter out (back to Hookshot as it was)
-param([string]$Hookshot = '', [switch]$Check, [switch]$Remove)
+#   -Remove   : takes all our lines and the adapter out (back to Longshot as it was)
+param([string]$Longshot = '', [switch]$Check, [switch]$Remove)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-if (-not $Hookshot) { $Hookshot = Join-Path $root '_build\hookshot' }
+if (-not $Longshot) { $Longshot = Join-Path $root '_build\LongshotBuilder\tools' }
 $cfg = Get-Content (Join-Path $root 'hooks.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $utf8 = New-Object System.Text.UTF8Encoding $false
 $mark = '// (retraced '
@@ -28,7 +28,7 @@ foreach ($h in $cfg.hooks) {
 
 $changes = 0
 foreach ($rel in $files.Keys) {
-    $path = Join-Path $Hookshot $rel
+    $path = Join-Path $Longshot $rel
     if (-not (Test-Path $path)) { throw "FAILED: file not found: $rel" }
     $text = Read-Text $path
     $nl = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
@@ -49,8 +49,8 @@ foreach ($rel in $files.Keys) {
     if (Write-Text $path ([string]::Join($nl, $lines))) { $changes++; "changed: $rel" } else { "unchanged: $rel" }
 }
 
-# the adapter, with rt_api.h written in place of its #include (Hookshot only follows its own headers)
-$dst = Join-Path $Hookshot $cfg.adapter.target
+# the adapter, with rt_api.h written in place of its #include (Longshot only follows its own headers)
+$dst = Join-Path $Longshot $cfg.adapter.target
 if ($Remove) {
     if (Test-Path $dst) {
         if (-not $Check) { Remove-Item -LiteralPath $dst }

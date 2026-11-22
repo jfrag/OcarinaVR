@@ -1,6 +1,8 @@
 # What the installer makes on your PC: never in git
 _build/
 game/
+# A clone of Longshot's source beside ours (for reading it; the installer uses its own copy)
+Longshot/
 
 # Game files: never in this repository
 *.nup

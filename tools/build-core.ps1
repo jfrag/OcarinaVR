@@ -1,6 +1,6 @@
-# Builds our core (src\*.cpp) into retraced.dll, in a few seconds, with the same compiler as Hookshot (llvm-mingw).
+# Builds our core (src\*.cpp) into retraced.dll, in a few seconds, with the same compiler as Longshot (llvm-mingw).
 #   -Mingw   : the llvm-mingw folder
-#   -Vulkan  : a folder with Khronos's Vulkan headers (the "include" folder of Hookshot's cpm part)
+#   -Vulkan  : a folder with Khronos's Vulkan headers (the "include" folder of Longshot's cpm tool)
 #   -OpenXR  : the unpacked OpenXR loader package of Khronos (include\, native\x64\release\bin\openxr_loader.dll)
 #   -Out     : the game folder the DLL goes to
 #   -Glslang : optional, glslang.exe: the shaders (src\shaders\*.comp) are compiled again into src\gen\*.h.
